@@ -1,0 +1,35 @@
+name = "imagoro-web-term"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Durable Object = one shell session container per session id.
+[[durable_objects.bindings]]
+name = "SESSIONS"
+class_name = "SessionContainer"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SessionContainer"]
+
+# The container image is built from ../Dockerfile (repo root). Deploy from this
+# directory: `wrangler deploy`. `dev` runs a local container without a real VM.
+[[containers]]
+class_name = "SessionContainer"
+image = "../Dockerfile"
+instance_type = "dev"
+max_instances = 10
+
+[vars]
+# Leave AGENT_TOKEN empty for an internal-only container and gate access at the
+# edge (Cloudflare Access on the Worker route). To require a token instead:
+#   wrangler secret put AGENT_TOKEN
+# and set the same value in the browser via VITE_AGENT_TOKEN at build time.
+AGENT_TOKEN = ""
+
+# Serve the built web app from the Worker too (optional). If you deploy the UI
+# to Pages instead, delete this block.
+[assets]
+directory = "../apps/web/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"

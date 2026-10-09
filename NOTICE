@@ -1,0 +1,10 @@
+Imagoro Web Term
+Copyright 2026 Imagoro Contributors
+
+This product includes software developed as part of the Imagoro project.
+
+Design tokens (design/tokens.json) are derived from the Imagoro UI token set,
+which was in turn derived from the Scout suite (routing-scouting-app-to-be-named
+web dashboard, Android colors, and the scout_crew desktop theme).
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).

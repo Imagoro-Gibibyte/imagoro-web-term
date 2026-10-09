@@ -1,0 +1,21 @@
+{
+  "name": "@imagoro/web-term-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Imagoro Web Term edge - Worker + Durable Object + Container that fronts a Linux pty agent",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "^0.3.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261009.1",
+    "typescript": "^5.6.0",
+    "wrangler": "^4.149.0"
+  }
+}

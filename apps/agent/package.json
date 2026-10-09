@@ -1,0 +1,22 @@
+{
+  "name": "@imagoro/web-term-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Imagoro Web Term pty agent - node-pty + ws shell server (Linux / Windows / macOS)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "src/server.mjs",
+  "bin": {
+    "imagoro-web-term-agent": "src/server.mjs"
+  },
+  "scripts": {
+    "start": "node src/server.mjs"
+  },
+  "dependencies": {
+    "node-pty": "^1.1.0",
+    "ws": "^8.22.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

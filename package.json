@@ -1,0 +1,29 @@
+{
+  "name": "imagoro-web-term",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Imagoro Web Term - browser-based, tabbable terminal emulator (Linux/Windows/macOS pty agents) on Cloudflare Pages + Containers",
+  "license": "Apache-2.0",
+  "type": "module",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @imagoro/web-term-web dev",
+    "build": "pnpm --filter @imagoro/web-term-web build",
+    "preview": "pnpm --filter @imagoro/web-term-web preview",
+    "agent": "pnpm --filter @imagoro/web-term-agent start",
+    "worker:dev": "pnpm --filter @imagoro/web-term-worker dev",
+    "worker:deploy": "pnpm --filter @imagoro/web-term-worker deploy",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "node-pty",
+      "esbuild",
+      "workerd",
+      "sharp"
+    ]
+  }
+}
