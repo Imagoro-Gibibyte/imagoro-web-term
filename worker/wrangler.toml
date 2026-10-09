@@ -27,6 +27,17 @@ max_instances = 10
 # and set the same value in the browser via VITE_AGENT_TOKEN at build time.
 AGENT_TOKEN = ""
 
+# Egress policy: the container has NO general internet (enableInternet=false).
+# Only the hosts in MIRROR_HOST are reachable, and the instances may fetch only
+# from MIRROR_URL. Leave both empty to allow no egress at all. See
+# docs/NETWORK-POLICY.md.
+MIRROR_HOST = ""
+MIRROR_URL = ""
+
+# Comma-separated peer addresses on the non-routable SSH mesh, e.g.
+# "100.64.0.7,100.64.0.9". Empty = no ssh:<peer> sessions offered.
+SSH_PEERS = ""
+
 # Serve the built web app from the Worker too (optional). If you deploy the UI
 # to Pages instead, delete this block.
 [assets]

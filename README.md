@@ -31,6 +31,25 @@ whose shell you want. A Linux container cannot spawn `powershell.exe`; that is
 why each OS is a **separate agent instance**, and the browser merely points tabs
 at them. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
+## Isolation & network policy
+
+A shell is dangerous by default, so the instances are deliberately sealed:
+
+- **No general internet** - the container runs with `enableInternet = false`.
+- **One allowed egress: an internal mirror** - `allowedHosts` = `MIRROR_HOST`;
+  the agent's `assertEgressAllowed` rejects every other host.
+- **Unique, non-operable address per instance** - a stable address in
+  `100.64.0.0/10` (RFC 6598 CGNAT), never routable on the web, used purely as
+  identity for the private mesh.
+- **Instances are SSH-capable** - `ssh:<peer>` tabs cross the non-routable mesh
+  (e.g. Linux -> Windows/macOS agent), key-only, no root.
+- **Mirror pull, nothing else** - `POST /mirror/pull` fetches the mirror into
+  the sandbox; that is the only repo source.
+- **Nothing downloads to a host machine** - writes of fetched material are
+  refused outside a container unless `AGENT_ALLOW_HOST_WRITES=1`.
+
+Full contract: [`docs/NETWORK-POLICY.md`](docs/NETWORK-POLICY.md).
+
 ## Quickstart
 
 Requirements: Node 20+ and pnpm 9.

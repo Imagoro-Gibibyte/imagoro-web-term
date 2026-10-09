@@ -41,6 +41,11 @@ Then point the UI at the Worker: build with `VITE_AGENT_URL=wss://<worker>/ws`.
 
 Notes:
 
+- **Isolation:** the container has no general internet
+  (`enableInternet = false`). Set `MIRROR_HOST` / `MIRROR_URL` in
+  `worker/wrangler.toml` to allow exactly one egress host (the mirror), and
+  `SSH_PEERS` to expose `ssh:<peer>` tabs over the non-routable mesh. See
+  [`NETWORK-POLICY.md`](NETWORK-POLICY.md).
 - The container listens on `8080` (see `Dockerfile`); `worker/src/session.ts`
   sets `defaultPort = 8080`.
 - `instance_type = "dev"` is cheap for testing; move to a larger instance type

@@ -15,11 +15,13 @@ Then in the web UI click `+` and pick a shell (the UI reads `GET /shells`).
 
 ## Endpoints
 
-| Method | Path       | Purpose                                              |
-| ------ | ---------- | ---------------------------------------------------- |
-| GET    | `/healthz` | liveness                                             |
-| GET    | `/shells`  | `{ platform, shell, shells[], version }`             |
-| WS     | `/ws`      | a shell session: `?shell=&cols=&rows=&token=`        |
+| Method | Path            | Purpose                                                    |
+| ------ | --------------- | ---------------------------------------------------------- |
+| GET    | `/healthz`      | liveness                                                   |
+| GET    | `/shells`       | `{ platform, shell, shells[], version }`                   |
+| GET    | `/instance`     | `{ ip, sandboxOnly, mirror, peers, egress }`               |
+| POST   | `/mirror/pull`  | pull the internal mirror into the sandbox; body `{ "ref" }`|
+| WS     | `/ws`           | a shell session: `?shell=&cols=&rows=&token=`              |
 
 ## WebSocket protocol (JSON text frames)
 
@@ -52,6 +54,14 @@ Agent -> client:
 | `AGENT_CWD`            | `process.cwd()` | working directory for sessions                          |
 | `AGENT_MAX_SESSIONS`   | `8`         | concurrent sessions                                        |
 | `AGENT_INSECURE`       | `0`         | `1` allows a non-loopback bind with no token (unsafe)      |
+| `AGENT_INSTANCE_IP`    | _(unset)_   | this instance's non-routable address (set by the Worker)    |
+| `AGENT_MIRROR_URL`     | _(unset)_   | the internal mirror; the only repo source, added to egress  |
+| `AGENT_ALLOWED_HOSTS`  | _(unset)_   | extra egress hosts (comma list); empty = no egress          |
+| `AGENT_SANDBOX_ONLY`   | _(unset)_   | `1` in a container: permits sandboxed writes                |
+| `AGENT_SANDBOX_DIR`    | temp dir    | where mirror pulls are written (never a host home)          |
+| `AGENT_ALLOW_HOST_WRITES` | `0`      | `1` allows fetched writes on a real host (unsafe)           |
+| `AGENT_SSH_PEERS`      | _(unset)_   | peers exposed as `ssh:<peer>` tabs on the mesh              |
+| `AGENT_SSH`            | `0`         | `1` starts `sshd` (the container sets this)                 |
 
 ## Safety
 
@@ -61,4 +71,11 @@ Agent -> client:
   like a password and always put TLS (wss) in front of it.
 - Shell selection is limited to a fixed per-platform allowlist, never an
   arbitrary command string, and the process is spawned with `shell: false`
-  semantics (node-pty execs the resolved binary directly).
+  semantics (node-pty execs the resolved binary directly) - including
+  `ssh:<peer>`, whose peer must be on `AGENT_SSH_PEERS` and match a safe
+  pattern.
+- **Egress is allowlisted** (`assertEgressAllowed`): the only fetch is the
+  mirror at `AGENT_MIRROR_URL`.
+- **Nothing is written to a host machine** by default: fetched material goes to
+  `AGENT_SANDBOX_DIR` and host writes are refused outside a container.
+- Full contract: [`../../docs/NETWORK-POLICY.md`](../../docs/NETWORK-POLICY.md).

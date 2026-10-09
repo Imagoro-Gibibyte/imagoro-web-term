@@ -5,15 +5,27 @@
 // It runs on Linux, Windows (ConPTY) and macOS; the shell it spawns is whatever
 // that host offers (bash/zsh vs powershell.exe/cmd.exe). Run one agent per OS
 // you want to reach - they are not meant to be combined on one host.
+//
+// Network posture: the agent assumes NO general internet. Its only egress is a
+// mirror pull from AGENT_MIRROR_URL, gated by ./netpolicy.mjs. Each instance
+// also carries a unique non-routable address and can open ssh:<peer> sessions
+// across the private mesh.
 import http from "node:http";
 import { createRequire } from "node:module";
 import { WebSocketServer } from "ws";
-import { defaultShellId, listShells, platformLabel } from "./shells.mjs";
+import { defaultShellId, listShells, platformLabel, resolveOnPath } from "./shells.mjs";
+import {
+  allowedEgressHosts,
+  instanceIp,
+  sandboxOnly,
+  sshPeers
+} from "./netpolicy.mjs";
+import { mirrorPull, mirrorUrl } from "./mirror.mjs";
 
 const require = createRequire(import.meta.url);
 const pty = require("node-pty");
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 const PORT = Number(process.env.AGENT_PORT ?? process.env.PORT ?? 8787);
 const HOST = process.env.AGENT_HOST ?? "127.0.0.1";
 const TOKEN = process.env.AGENT_TOKEN ?? "";
@@ -29,12 +41,41 @@ if (!LOOPBACK.has(HOST) && !TOKEN && process.env.AGENT_INSECURE !== "1") {
   process.exit(1);
 }
 
-const shells = listShells();
-const defaultShell = defaultShellId(shells);
+// Local shells first, then ssh:<peer> entries for the private mesh.
+const localShells = listShells();
+const sshPath = resolveOnPath("ssh");
+const peers = sshPeers().filter((p) => /^[A-Za-z0-9._:-]+$/.test(p) && !p.startsWith("-"));
+const peerShells = sshPath
+  ? peers.map((peer) => ({
+      id: `ssh:${peer}`,
+      path: sshPath,
+      args: [
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "UserKnownHostsFile=/dev/null",
+        "-o",
+        "LogLevel=ERROR",
+        "-o",
+        "ConnectTimeout=10",
+        peer
+      ]
+    }))
+  : [];
+const shells = [...localShells, ...peerShells];
+const defaultShell = defaultShellId(localShells) ?? shells[0]?.id ?? null;
+
 console.log(`[agent] imagoro web term agent v${VERSION} on ${platformLabel()}`);
 console.log(
   `[agent] shells: ${shells.map((s) => s.id).join(", ") || "(none detected)"}` +
     `  default: ${defaultShell ?? "(none)"}`
+);
+console.log(
+  `[agent] instance ip: ${instanceIp() || "(unset)"}  sandbox-only: ${sandboxOnly()}`
+);
+console.log(
+  `[agent] egress allowlist: ${[...allowedEgressHosts()].join(", ") || "(none - no egress)"}` +
+    `  mirror: ${mirrorUrl() || "(unset)"}`
 );
 
 /** @type {Set<import('node-pty').IPty>} */
@@ -49,12 +90,47 @@ const json = (res, code, body) => {
   res.end(payload);
 };
 
-const server = http.createServer((req, res) => {
+function httpAuthorized(req, url) {
+  if (!TOKEN) return true;
+  const header = req.headers["authorization"] ?? "";
+  if (header === `Bearer ${TOKEN}`) return true;
+  return url.searchParams.get("token") === TOKEN;
+}
+
+function readJson(req, limit = 64 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on("data", (c) => {
+      size += c.length;
+      if (size > limit) {
+        reject(new Error("body too large"));
+        req.destroy();
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on("end", () => {
+      const text = Buffer.concat(chunks).toString("utf8").trim();
+      if (!text) return resolve({});
+      try {
+        resolve(JSON.parse(text));
+      } catch {
+        reject(new Error("invalid JSON body"));
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? HOST}`);
-  if (url.pathname === "/healthz") {
+
+  if (req.method === "GET" && url.pathname === "/healthz") {
     return json(res, 200, { ok: true, platform: platformLabel(), version: VERSION });
   }
-  if (url.pathname === "/shells") {
+
+  if (req.method === "GET" && url.pathname === "/shells") {
     return json(res, 200, {
       ok: true,
       platform: platformLabel(),
@@ -63,14 +139,40 @@ const server = http.createServer((req, res) => {
       version: VERSION
     });
   }
-  if (url.pathname === "/") {
+
+  if (req.method === "GET" && url.pathname === "/instance") {
+    return json(res, 200, {
+      ok: true,
+      version: VERSION,
+      platform: platformLabel(),
+      ip: instanceIp(),
+      sandboxOnly: sandboxOnly(),
+      mirror: mirrorUrl(),
+      peers,
+      egress: [...allowedEgressHosts()]
+    });
+  }
+
+  if (req.method === "POST" && url.pathname === "/mirror/pull") {
+    if (!httpAuthorized(req, url)) return json(res, 401, { ok: false, error: "unauthorized" });
+    try {
+      const body = await readJson(req);
+      const result = await mirrorPull(typeof body.ref === "string" ? body.ref : "HEAD");
+      return json(res, 200, { ok: true, ...result });
+    } catch (err) {
+      return json(res, 400, { ok: false, error: String(err.message ?? err) });
+    }
+  }
+
+  if (req.method === "GET" && url.pathname === "/") {
     res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
     return res.end(
       `Imagoro Web Term agent v${VERSION}\n` +
         `Connect with a WebSocket to /ws?shell=<id>&cols=<n>&rows=<n>.\n` +
-        `Endpoints: /healthz, /shells\n`
+        `Endpoints: /healthz, /shells, /instance, POST /mirror/pull\n`
     );
   }
+
   json(res, 404, { ok: false, error: "not found" });
 });
 
@@ -109,7 +211,7 @@ wss.on("connection", (ws, _req, url) => {
 
   let term;
   try {
-    term = pty.spawn(shell.path, [], {
+    term = pty.spawn(shell.path, shell.args ?? [], {
       name: "xterm-256color",
       cols,
       rows,

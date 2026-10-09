@@ -1,4 +1,5 @@
 import { getContainer } from "@cloudflare/containers";
+import { nonRoutableIpFor } from "./network";
 import { SessionContainer, type Env } from "./session";
 
 export { SessionContainer };
@@ -25,6 +26,12 @@ export default {
 
     if (url.pathname === "/health") {
       return Response.json({ ok: true, service: "imagoro-web-term" });
+    }
+
+    // The non-routable address this session will be given (no container start).
+    if (url.pathname === "/instance") {
+      const session = url.searchParams.get("session") ?? "default";
+      return Response.json({ session, ip: nonRoutableIpFor(session) });
     }
 
     if (env.ASSETS) return env.ASSETS.fetch(request);
