@@ -25,5 +25,8 @@
       "workerd",
       "sharp"
     ]
+  },
+  "devDependencies": {
+    "wrangler": "^4.149.0"
   }
 }
