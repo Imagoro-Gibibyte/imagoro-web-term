@@ -53,6 +53,9 @@ pnpm --filter @imagoro/web-term-web exec wrangler pages deploy dist \
 - `.github/workflows/pages.yml` does this automatically on push to `main` once
   the repo has `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets, and
   the `imagoro-web-term` Pages project exists.
+- The deploy step only runs when the repo **variable** `CLOUDFLARE_DEPLOY` is
+  `1` (secrets cannot be referenced from a step `if:`). Set it to `1` after
+  adding the two secrets; the build+smoke steps run regardless.
 
 ## 2. Shell -> Cloudflare Containers (Workers Paid + Docker)
 
