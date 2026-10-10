@@ -81,8 +81,17 @@ console.log(
 /** @type {Set<import('node-pty').IPty>} */
 const live = new Set();
 
+// The Pages UI is a different origin; let cross-origin reads through. The WS
+// upgrade itself is not CORS-gated by browsers, but GET /shells etc. are.
+function applyCors(res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "authorization, content-type");
+}
+
 const json = (res, code, body) => {
   const payload = JSON.stringify(body);
+  applyCors(res);
   res.writeHead(code, {
     "content-type": "application/json; charset=utf-8",
     "content-length": Buffer.byteLength(payload)
@@ -126,6 +135,12 @@ function readJson(req, limit = 64 * 1024) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? HOST}`);
 
+  if (req.method === "OPTIONS") {
+    applyCors(res);
+    res.writeHead(204);
+    return res.end();
+  }
+
   if (req.method === "GET" && url.pathname === "/healthz") {
     return json(res, 200, { ok: true, platform: platformLabel(), version: VERSION });
   }
@@ -165,6 +180,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === "GET" && url.pathname === "/") {
+    applyCors(res);
     res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
     return res.end(
       `Imagoro Web Term agent v${VERSION}\n` +
