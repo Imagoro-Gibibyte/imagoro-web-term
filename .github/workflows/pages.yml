@@ -28,9 +28,12 @@ jobs:
 
       - name: Smoke (files + build)
         run: pnpm build && AGENT_SMOKE=0 node scripts/smoke.mjs
+        env:
+          VITE_AGENT_URL: ${{ vars.VITE_AGENT_URL }}
+          VITE_AGENT_TOKEN: ${{ secrets.VITE_AGENT_TOKEN }}
 
       - name: Deploy to Cloudflare Pages
-        if: ${{ github.ref == 'refs/heads/main' }}
+        if: ${{ github.ref == 'refs/heads/main' && secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
